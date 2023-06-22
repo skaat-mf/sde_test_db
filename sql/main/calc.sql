@@ -42,15 +42,20 @@ HAVING count(tmp.passenger_group) > 1;
 
 -- 4.	Вывести номера брони и контактную информацию по пассажирам в брони (passenger_id, passenger_name, contact_data) с количеством людей в брони = 3
 INSERT INTO bookings.results (id, response)
-SELECT 4 as id, concat_ws('|', passenger_id, passenger_name, contact_data ) as passenger_info
-FROM bookings.tickets
-WHERE book_ref IN (
-                      SELECT book_ref
-                      FROM bookings.tickets
-                      GROUP BY book_ref
-                      HAVING COUNT(passenger_id) = 3
-                  )
-ORDER BY passenger_info;
+SELECT  4 as id, concat_ws('|', t.book_ref, string_agg(t.passenger_info, '|'))
+FROM (
+         SELECT book_ref
+              , concat_ws('|', passenger_id, passenger_name, contact_data) AS passenger_info
+         FROM bookings.tickets
+         WHERE book_ref IN (
+                               SELECT book_ref
+                               FROM bookings.tickets
+                               GROUP BY book_ref
+                               HAVING count(passenger_id) = 3
+                           )
+     ) t
+GROUP BY t.book_ref
+ORDER BY 2;
 
 
 -- 5.	Вывести максимальное количество перелётов на бронь
@@ -259,11 +264,15 @@ ORDER BY tmp.actual_departure;
 
 -- 20.	Вывести среднее количество вылетов в день из Москвы за 09 месяц 2016 года
 INSERT INTO bookings.results (id, response)
-SELECT 20 as id, count(flight_id) / 30 as avg_flight_num
-FROM bookings.flights_v
-WHERE status in ('Arrived', 'Departed')
-  AND departure_city = 'Москва'
-  AND date_trunc('month',actual_departure)::date = '2016-09-01'::date;
+SELECT 20 as id, round(avg(t.cnt_flight_id)) as avg_flight_num
+FROM (
+         SELECT count(flight_id) as cnt_flight_id
+         FROM bookings.flights_v
+         WHERE status IN ('Arrived', 'Departed')
+           AND departure_city = 'Москва'
+           AND date_trunc('month', actual_departure)::date = '2016-09-01'::date
+         GROUP BY date_trunc('day', actual_departure)
+     ) t;
 
 
 -- 21.	Вывести топ 5 городов у которых среднее время перелета до пункта назначения больше 3 часов
